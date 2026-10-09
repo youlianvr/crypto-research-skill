@@ -1,0 +1,189 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# filters.solana.yaml — THE FILE YOU EDIT
+#
+# This is the operator's taste expressed as numbers. Every criterion in
+# reference/criteria.md resolves here. Nothing in reference/*.md needs to change
+# when a threshold changes — if it does, the criterion was written wrong.
+#
+# Defaults below are deliberately conservative starting points for memecoin-class
+# Solana lanes, chosen so that a fresh install rejects obviously-bad tokens. They
+# are NOT financial advice and NOT calibrated to any market. Calibrate by reading
+# `rejected_by_criterion` from real runs (see pipeline.md §Run summary).
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: 1
+chain: solana
+config_profile: default-conservative
+updated: 2026-10-09
+
+# ── What the run may spend ───────────────────────────────────────────────────
+budget:
+  max_enriched: 40              # hard cap on tokens reaching T1+ per run
+  max_indexer_credits: 400      # the scarce resource; reserved for T2
+  max_wall_seconds: 900
+  on_budget_exhausted: emit_watch   # never fabricate, never silently drop
+  paid_sources_enabled: false       # x402 / per-call priced MCPs stay off
+
+# ── The scan scopes ─────────────────────────────────────────────────────────
+lanes:
+
+  new_launch:
+    description: "Fresh mints and fresh pools"
+    age_max_minutes: 720
+    discovery: [dex_new_pairs, launchpad_programs]
+    # the strictest lane: almost everything here is a rug, so kills do the work
+    kill_overrides:
+      LIQ_USD_MIN: 8000
+      HOLDERS_MIN: 60
+      AGE_MIN_MINUTES: 3          # blocks same-block snipes from the feed itself
+      TOP10_EX_LP_MAX: 35
+      BUNDLE_SHARE_MAX: 30
+
+  graduation:
+    description: "Leaving a bonding curve into a real AMM pool"
+    age_max_minutes: 10080
+    discovery: [launchpad_graduation_events]
+    kill_overrides:
+      LIQ_USD_MIN: 15000
+      HOLDERS_MIN: 150
+      TOP10_EX_LP_MAX: 32
+      BUNDLE_SHARE_MAX: 25
+
+  traction:
+    description: "Older tokens waking up — the delta lane, not a launch feed"
+    age_min_minutes: 1440          # ≥ 1 day old by definition
+    age_max_minutes: null          # no upper bound; old tokens are welcome here
+    discovery: [trending_feeds, liquidity_deltas]
+    requires_history: true         # needs ≥ 2 observations; a single snapshot cannot show "waking up"
+    kill_overrides:
+      LIQ_USD_MIN: 50000
+      HOLDERS_MIN: 500
+      TOP10_EX_LP_MAX: 25
+      BUNDLE_SHARE_MAX: 20
+
+  watchlist:
+    description: "Re-check of prior WATCH verdicts — delta only, never re-enrich from zero"
+    discovery: [previous_run_watch]
+    rescan:
+      max_attempts: 4
+      max_age_hours: 72
+      on_no_change: reject_with_reason   # reason: stale_watch
+
+# ── Risk sizing used by the sellability test ────────────────────────────────
+# SELL_IMPACT is measured against YOUR size, not an abstract one.
+position_size_usd: 2000
+
+# ── Global kill thresholds (overridable per lane above) ─────────────────────
+thresholds:
+  LIQ_USD_MIN: 25000
+  HOLDERS_MIN: 250
+  AGE_MIN_MINUTES: 10
+  TOP10_EX_LP_MAX: 30            # percent, excluding pool/vault owners
+  TOP1_EX_LP_MAX: 10
+  SELL_IMPACT_MAX_PCT: 5
+  DEV_HOLD_MAX_PCT: 5
+  DEV_PRIOR_RUGS_MAX: 0
+  BUNDLE_SHARE_MAX: 25
+  UNIQUE_BUYERS_RATIO_MIN: 0.15
+  FDV_LIQ_RATIO_MAX: 30
+  TRANSFER_FEE_BPS_MAX: 300      # over this it is a tax, not a fee
+  SOCIAL_OLDEST_ACCOUNT_MIN_DAYS: 7
+
+# ── Score bands (per lane where they differ) ────────────────────────────────
+scoring:
+  weights:
+    HOLDER_GROWTH: 12
+    SELL_IMPACT: 15
+    UNIQUE_BUYERS_RATIO: 14
+    VOL_LIQ_RATIO: 8
+    BUY_SELL_BALANCE: 6
+    TOP1_EX_LP: 6
+    LP_LOCKED: 4
+    FDV_LIQ_RATIO: 6
+    DEV_HOLD_PCT: 6
+    DEV_FUNDING_SOURCE: 3
+    SOCIAL_PRESENT: 2
+    SOCIAL_AGE: 3
+    AUTH_METADATA_MUTABLE: 3
+  lane_multipliers:
+    new_launch: { HOLDER_GROWTH: 0.5, UNIQUE_BUYERS_RATIO: 1.2, VOL_LIQ_RATIO: 0.6 }
+    graduation: { HOLDER_GROWTH: 1.0, UNIQUE_BUYERS_RATIO: 1.0, VOL_LIQ_RATIO: 1.0 }
+    traction:   { HOLDER_GROWTH: 1.6, UNIQUE_BUYERS_RATIO: 1.0, VOL_LIQ_RATIO: 1.2 }
+    watchlist:  { HOLDER_GROWTH: 1.4 }
+
+verdicts:
+  watch_floor: 35
+  research_floor: 55
+  candidate_floor: 70
+  candidate_requires:            # ALL must hold, independent of score
+    - no_kills
+    - no_blocking_unknowns
+    - tier_reached: T2
+    - tradability_simulated: true
+    - deployer_identity_confidence: high
+
+# ── Per-criterion policy, mirroring reference/criteria.md ───────────────────
+# kind: kill | score | info        missing_policy: fail_closed | fail_open | unknown_ok
+criteria:
+  AUTH_MINT:              { kind: kill,  field: authorities.mint,        expect: revoked,      missing_policy: fail_closed }
+  AUTH_FREEZE:            { kind: kill,  field: authorities.freeze,      expect: revoked,      missing_policy: fail_closed }
+  AUTH_METADATA_MUTABLE:  { kind: score, field: authorities.metadata_mutable, penalise_if: true, missing_policy: fail_open }
+  SUPPLY_ANOMALY:         { kind: kill,  field: supply.anomaly,          expect: false,        missing_policy: unknown_ok }
+
+  EXT_TRANSFER_HOOK:      { kind: kill,  field: extensions.transfer_hook,        expect: absent, missing_policy: fail_closed }
+  EXT_PERMANENT_DELEGATE: { kind: kill,  field: extensions.permanent_delegate,   expect: absent, missing_policy: fail_closed }
+  EXT_NON_TRANSFERABLE:   { kind: kill,  field: extensions.non_transferable,     expect: false,  missing_policy: fail_closed }
+  EXT_DEFAULT_FROZEN:     { kind: kill,  field: extensions.default_account_state, expect: unfrozen, missing_policy: fail_closed }
+  EXT_TRANSFER_FEE:       { kind: score, field: extensions.transfer_fee_bps,     missing_policy: unknown_ok }
+  EXT_INTEREST_BEARING:   { kind: info,  field: extensions.interest_bearing,     missing_policy: fail_open }
+  EXT_CONFIDENTIAL_TRANSFER: { kind: score, field: extensions.confidential_transfer, penalise_if: true, missing_policy: fail_open }
+
+  TOP10_EX_LP:            { kind: kill,  field: holders.top10_excluding_pools_pct, missing_policy: fail_closed }
+  TOP1_EX_LP:             { kind: score, field: holders.top1_excluding_pools_pct,  missing_policy: unknown_ok }
+  LP_ACCOUNTED:           { kind: kill,  field: holders.pool_owners_identified,    expect: true, missing_policy: unknown_ok }
+  HOLDERS_MIN:            { kind: kill,  field: holders.count,                     missing_policy: unknown_ok }
+  HOLDER_GROWTH:          { kind: score, field: holders.growth_rate_24h_pct,       missing_policy: unknown_ok }
+  CEX_CUSTODY_UNRESOLVED: { kind: info,  field: holders.known_custody_pct,         missing_policy: fail_open }
+
+  LP_PRESENT:             { kind: kill,  field: liquidity.pools,        expect: non_empty, missing_policy: fail_closed }
+  LIQ_USD_MIN:            { kind: kill,  field: liquidity.usd,          missing_policy: fail_closed }
+  LP_LOCKED:              { kind: score, field: liquidity.lp_locked_or_burned, missing_policy: unknown_ok }  # null == n/a on standard AMMs
+  LP_OWNER_WALLET:        { kind: kill,  field: liquidity.lp_held_by_deployer, expect: false, missing_policy: fail_closed }
+  POOL_ONE_SIDED:         { kind: kill,  field: liquidity.one_sided,    expect: false, missing_policy: fail_closed }
+  FDV_LIQ_RATIO:          { kind: score, field: market.fdv_over_liquidity, missing_policy: fail_open }
+
+  SELL_ROUTE:             { kind: kill,  field: tradability.route_exists,     expect: true,  missing_policy: fail_closed }
+  SELL_IMPACT:            { kind: kill,  field: tradability.price_impact_pct, missing_policy: fail_closed }
+  BUY_SELL_BALANCE:       { kind: score, field: trades.buys_over_sells,       missing_policy: unknown_ok }
+  VOL_LIQ_RATIO:          { kind: score, field: trades.volume_over_liquidity, missing_policy: unknown_ok }
+  UNIQUE_BUYERS_RATIO:    { kind: kill,  field: trades.unique_buyers_over_trades, missing_policy: unknown_ok }
+  AVG_TRADE_SIZE_SPREAD:  { kind: score, field: trades.size_distribution,     missing_policy: fail_open }
+  REPEATED_ROUNDTRIPS:    { kind: score, field: trades.roundtrip_wallets_pct, missing_policy: unknown_ok }
+  LAUNCH_BUNDLE_SHARE:    { kind: kill,  field: launch.bundled_or_single_slot_share_pct, missing_policy: unknown_ok }
+  AGE_MIN:                { kind: kill,  field: age_minutes,                  missing_policy: unknown_ok }
+
+  DEV_HOLD_PCT:           { kind: kill,  field: deployer.current_hold_pct,    missing_policy: unknown_ok }
+  DEV_PRIOR_RUGS:         { kind: kill,  field: deployer.prior_rugged_tokens, missing_policy: unknown_ok }
+  DEV_PRIOR_LAUNCHES:     { kind: info,  field: deployer.prior_launch_count,  missing_policy: fail_open }
+  DEV_FUNDING_SOURCE:     { kind: score, field: deployer.funding_provenance,  missing_policy: fail_open }
+  DEV_LINKED_TO_ACTIVE_TOKEN: { kind: score, field: deployer.overlaps_with_live_tokens, missing_policy: fail_open }
+
+  SOCIAL_PRESENT:         { kind: score, field: socials.has_official_site_and_social, missing_policy: fail_open }
+  SOCIAL_AGE:             { kind: score, field: socials.oldest_account_age_days,      missing_policy: fail_open }
+  PAID_PROMO_SIGNALS:     { kind: info,  field: context.boost_or_paid_listing,        missing_policy: fail_open }
+  LISTING_STATUS:         { kind: info,  field: context.cex_listings,                 missing_policy: fail_open }
+
+# ── Criteria that exist but are deliberately NOT wired for this chain ───────
+# Declared so the mapping stays auditable: a check we know about, switched off.
+# If an id is neither here nor in `criteria:` above, the catalogue has drifted.
+declared_not_applicable:
+  - id: AUTH_OWNER_RENOUNCED
+    note: "EVM-lane criterion (upgradeable contract owner) — no equivalent on Solana; wire it in the EVM adapter"
+
+# ── Chains not yet implemented ──────────────────────────────────────────────
+# Kept here on purpose: the criterion ids are chain-agnostic, so each new chain
+# needs its own adapter block, NOT a copy of this file with new numbers.
+other_chains:
+  - { chain: base,  status: not_implemented, adapter: null }
+  - { chain: bsc,   status: not_implemented, adapter: null }
+  - { chain: ethereum, status: not_implemented, adapter: null, note: "needs the EVM criterion block: honeypot/sell-sim, owner renounce, proxy/admin, blacklist, tax, max-tx, cooldown, LP lock contract" }
