@@ -92,7 +92,10 @@ project as-is. The documents need nothing installed; only
   catalog claims from a local hub snapshot (2026-10-01), never installed or called.
   Treat every capability line as unverified until you call it.
 - **Defaults are uncalibrated.** The thresholds are conservative starting points for
-  memecoin-class lanes, not measured ones.
+  memecoin-class lanes, not measured ones. One exception: `MCAP_MIN` carries a starting
+  value taken from a public practitioner source rather than invented here — see
+  [`reference/sources.md`](reference/sources.md) §8, which also explains how the rest
+  of the numbers should eventually be earned.
 - **Other chains are stubs.** Base / BSC / Ethereum need their own criterion block
   (honeypot simulation, owner renounce, proxy, blacklist, tax, max-tx, LP lock) — a new
   adapter, not a copy of the Solana numbers.

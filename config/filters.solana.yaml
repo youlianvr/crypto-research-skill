@@ -38,6 +38,7 @@ lanes:
       AGE_MIN_MINUTES: 3          # blocks same-block snipes from the feed itself
       TOP10_EX_LP_MAX: 35
       BUNDLE_SHARE_MAX: 30
+      MCAP_MIN: null               # n/a here: a fresh launch is legitimately tiny
 
   graduation:
     description: "Leaving a bonding curve into a real AMM pool"
@@ -60,6 +61,7 @@ lanes:
       HOLDERS_MIN: 500
       TOP10_EX_LP_MAX: 25
       BUNDLE_SHARE_MAX: 20
+      MCAP_MIN: 25000
 
   watchlist:
     description: "Re-check of prior WATCH verdicts — delta only, never re-enrich from zero"
@@ -76,6 +78,7 @@ position_size_usd: 2000
 # ── Global kill thresholds (overridable per lane above) ─────────────────────
 thresholds:
   LIQ_USD_MIN: 25000
+  MCAP_MIN: 25000                 # absolute market-cap floor; provenance in sources.md §8
   HOLDERS_MIN: 250
   AGE_MIN_MINUTES: 10
   TOP10_EX_LP_MAX: 30            # percent, excluding pool/vault owners
@@ -151,6 +154,7 @@ criteria:
   LP_OWNER_WALLET:        { kind: kill,  field: liquidity.lp_held_by_deployer, expect: false, missing_policy: fail_closed }
   POOL_ONE_SIDED:         { kind: kill,  field: liquidity.one_sided,    expect: false, missing_policy: fail_closed }
   FDV_LIQ_RATIO:          { kind: score, field: market.fdv_over_liquidity, missing_policy: fail_open }
+  MCAP_MIN:               { kind: kill,  field: market.market_cap_usd,   missing_policy: unknown_ok }  # n/a in the new_launch lane
 
   SELL_ROUTE:             { kind: kill,  field: tradability.route_exists,     expect: true,  missing_policy: fail_closed }
   SELL_IMPACT:            { kind: kill,  field: tradability.price_impact_pct, missing_policy: fail_closed }

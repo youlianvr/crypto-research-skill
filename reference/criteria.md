@@ -86,6 +86,7 @@ and still be un-sellable at the protocol level.
 | `LP_OWNER_WALLET` | kill | `liquidity.lp_held_by_deployer` false | required false | FAIL_CLOSED | deployer holding the LP can pull the floor |
 | `FDV_LIQ_RATIO` | score | `market.fdv_over_liquidity` | ≤ 30 | FAIL_OPEN | an FDV far above liquidity prices a token you cannot sell |
 | `POOL_ONE_SIDED` | kill | `liquidity.one_sided` false | required false | FAIL_CLOSED | one-sided pools are a rug shape, not a market |
+| `MCAP_MIN` | kill | `market.market_cap_usd` | ≥ 25000 (`traction`) | UNKNOWN_OK | a floor under the noise; **must resolve `n/a` in `new_launch`** — there a tiny cap is the point, not a defect |
 
 ## E. Trade behaviour (the fraud filter)
 
@@ -132,7 +133,7 @@ the two must not be confused in the report.
 | A supply & authority | full | full | full | full |
 | B transfer semantics | full | full | full | full |
 | C distribution | `HOLDERS_MIN` low | normal | growth-weighted | delta only |
-| D liquidity | low floor | graduated floor | high floor | delta |
+| D liquidity & mcap | low floor, `MCAP_MIN` n/a | graduated floor | high floor + `MCAP_MIN` | delta |
 | E trade behaviour | bundle + sell route | sell route + flow | **primary** (unique buyers, vol/liq, roundtrips) | delta |
 | F deployer | full | full | full | full |
 | G context | info only | info only | `HOLDER_GROWTH` + socials | delta |

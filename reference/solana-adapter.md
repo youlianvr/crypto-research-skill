@@ -214,6 +214,17 @@ token on `DEV_PRIOR_RUGS` computed from a low-confidence identity.
   (applies, could not be read). They must stay distinct in the record.
 - Scoring a Token-2022 mint with an SPL-Token-era reader that never inspects
   extensions — i.e. block B silently passing everything.
+- **Hand-editing an aggregator's swap instruction.** Reported externally (LINUX DO,
+  2025-03): a developer took a Jupiter quote, modified Jupiter's `swap-instruction`
+  to inject a custom priority fee, and the transaction then failed on-chain; how to
+  land through Jito bundling was the separate question they could not answer. If the
+  tier-2 sell simulation builds a swap transaction, build it through the aggregator's
+  own path and do not assume an edited instruction still simulates or lands.
+  *(Public forum report; not reproduced inside this kit.)*
+- **Reading a successful simulation as proof that a *bundled* entry would land.**
+  `simulateTransaction` exercises the transaction, not the submission path, and a
+  Jito-style bundle is a different route. Simulated failure is strong evidence a token
+  cannot be sold; simulated success is not evidence of a working purchase.
 
 ---
 

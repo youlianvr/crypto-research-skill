@@ -58,7 +58,8 @@ only thing that may be turned into prose. Two rules:
   },
 
   "market": {
-    "price_usd": 0.00042, "fdv_usd": 420000, "volume_24h_usd": 310000,
+    "price_usd": 0.00042, "fdv_usd": 420000, "market_cap_usd": 420000,
+    "volume_24h_usd": 310000,
     "fdv_over_liquidity": 5.0, "source": "aggregator"
   },
 

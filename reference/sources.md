@@ -90,6 +90,25 @@ plus `tatumio/blockchain-mcp`. The EVM adapter will need its own criterion block
 (honeypot/sell simulation, ownership renounce, proxy/admin, blacklist, tax,
 max-tx/cooldown, LP lock contract) — do not reuse block B.
 
+**Second pass over the same snapshot (2026-10-09).** A keyword sweep of the catalog
+surfaced these additional entries. Same label, same caveat: **names only, nothing
+installed or called.** They are listed because they are recognisable — meeting one on
+a registry gives you a place to start reading, not a reason to trust it.
+
+| Group | Entries |
+|---|---|
+| Solana-specific | `wowinter13/solscan-mcp` (explorer), `solana-dev-mcp`, `solana-mcp-vybe`, `araa47/jupiter-mcp`, `armorwallet/armor-crypto-mcp` |
+| Multi-chain reads | `wkalidev/multichain-mcp`, `base/base-mcp`, `bankless/onchain-mcp`, `alchemy/alchemy-mcp-server`, `Thirdweb` |
+| Risk / intelligence | `ahnlabio/bicscan-mcp` (address & token risk), `szhygulin/recon-crypto-mcp`, `0xDegenMo/lighter-mcp`, `andresdefi/zerodust`, `bakyang2/kr-crypto-intelligence`, `VENTURE-AI-LABS/cryptodataapi-mcp`, `4dmrkey/cryptopolitan-mcp`, `aaronjmars/web3-research-mcp`, `Token Metrics` |
+| Market data (also serves the tokenised-equity lane) | `twelvedata/mcp`, `mcp-yfinance`, `berlinbra/alpha-vantage-mcp`, `anjor/coinmarket-mcp-server`, `binance-mcp-server`, `tickdb-unified-realtime-marketdata-api`, `truetick-gg/mcp`, `tradingview-mcp` |
+| Execution-shaped — keep out of the research route | `TradeRouter/trade-router-mcp`, `Trade-Agent/trade-agent-mcp`, `staccDOTsol/staccbot-tg`, `botwallet-co/mcp`, `blockrunai/blockrun-mcp`, `polymarket-paper-trader` |
+
+**A keyword pass is not a curated list.** The sweep matched crypto-ish words, so it
+also matched a whole family of LLM *token-budget* tools — `tokensave`, `tokenmeter`,
+`TokenBurnRate`, `llm-token-tracker`, `ZeroToken` — none of which belong in this file.
+The names above were filtered by hand against §5; keep doing that rather than trusting
+a regex.
+
 ## 5. Safety rules for anything you install
 
 An MCP server is **code with your agent's privileges**. In this domain the failure
@@ -153,3 +172,26 @@ writeup — useful as evidence of which knobs exist, not as recommended values:
 Also noted: an AI-persona memecoin (`JEANPHIL`, Solana) that went $12.2M → $5.9M once
 users suspected the influencer was generated — a concrete case for a
 **creator/persona verification** criterion rather than only on-chain checks.
+
+---
+
+## 8. Public practitioner references (2026-10-09)
+
+Public, citable sources. Unlike §7 they are not forwarded promo posts — they are
+written material with a URL, safe to link from anywhere. They are still
+**practitioner material, not ground truth**: they calibrate the *shape* of a check and
+supply starting numbers, and none of them proves a field is actually obtainable.
+
+| Reference | What it is good for |
+|---|---|
+| `https://teletype.in/@cryptoscamm/dexscreener` | a written basic on-chain screening recipe. Filter Gainers/Losers for **≥ 1 month of trading history**, **market cap ≥ $25 000**, and non-zero volume (a decaying volume curve is accumulation, not death). Then open the transaction list, filter buys **> $2 500**, find the outlier buy, open that wallet and check whether it **sells immediately** — the roundtrip speculator. It also lays out the tool tiers: plain scanners (etherscan / bscscan / tonscan), aggregators (DexScreener / DEXTools), deep-analysis (Arkham / Dune / Zerion) |
+| LINUX DO thread on a **Jupiter** arbitrage bot (2025-03) | the execution trap behind the sellability test: a dev gets a Jupiter quote, takes Jupiter's `swap-instruction`, **injects a custom priority fee by editing that instruction**, and the transaction then fails on-chain; landing via **Jito** bundling is the separate question they could not answer. Matters the moment you build the sell transaction yourself |
+| LINUX DO thread on extracting **bulk Solana history** (2025-07) | the ingestion ceiling: `getSignaturesForAddress` pages 1 000 signatures cheaply, but `getTransaction` per signature is the real bottleneck; free RPC tiers (Helius / Ankr / Shyft) rate-limit **by IP**, so registering extra keys on one IP does not help |
+
+The first row is worth reading closely for two reasons. It corroborates the
+`traction` lane's shape (`AGE_MIN`, volume presence, roundtrip wallets) with actual
+**numbers**, and it supplies the market-cap floor this catalogue previously lacked —
+`MCAP_MIN`, wired in `config/filters.solana.yaml` with `25000` as its starting value.
+Its wallet-level "whale" threshold also lands within the same order of magnitude as
+the operator's own `position_size_usd`, which is the reasoning already used for
+`SELL_IMPACT`: a signal is only meaningful at your own size.
